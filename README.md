@@ -111,3 +111,19 @@ node review.mjs <你的仓库> --from-report gitleaks-report.json
 
 输出 `real` / `triaged` 两个值，并把摘要写进 Job Summary。
 该 Action 已在本仓库的真 runner 上跑通（见 `.github/workflows/self-test-action.yml`）。
+
+## 支持哪些扫描器（3 秒判断能不能用）
+
+| 你用的扫描器 | 怎么接 |
+|---|---|
+| **gitleaks** | `gitleaks detect --report-format json --report-path gitleaks.json` → `--from-report gitleaks.json` |
+| **TruffleHog** | `trufflehog filesystem . --json > th.json` → `--from-report th.json` |
+| **Semgrep / 任意 SARIF 工具** | 直接喂 SARIF 文件 |
+| **GitHub 原生 secret scanning** | `gh api /repos/{o}/{r}/secret-scanning/alerts > alerts.json` → `--from-report alerts.json` |
+| **自研 / grep / git-hound** | 任何含 `路径:行号` 的文本 |
+
+```bash
+# 例：GitHub 自家告警（最吵的那种）
+gh api /repos/OWNER/REPO/secret-scanning/alerts > alerts.json
+node review.mjs . --from-report alerts.json
+```

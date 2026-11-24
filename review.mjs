@@ -107,6 +107,21 @@ export function parseScannerReport(raw) {
     }
     if (out.length > 0) return out
   }
+  // GitHub 原生 secret scanning 告警（`gh api /repos/{o}/{r}/secret-scanning/alerts` 的导出）：
+  // 形态 [{number, secret_type, locations:[{details:{path, start_line}}]}]。GitHub 自家告警最吵，
+  // 尤其是 generic 类型，所以支持它的价值很高。
+  const ghAlerts = (Array.isArray(parsed) ? parsed : []).filter((it) => it && Array.isArray(it.locations) && it.locations.length > 0 && (it.secret_type || it.number))
+  if (ghAlerts.length > 0) {
+    const out = []
+    for (const a of ghAlerts) {
+      for (const loc of a.locations) {
+        const path = loc?.details?.path ?? loc?.details?.file_path
+        if (!path) continue
+        out.push({ file: String(path), line: Number(loc?.details?.start_line ?? 0) || null, rule: a.secret_type_display_name ?? a.secret_type ?? null })
+      }
+    }
+    if (out.length > 0) return out
+  }
   // TruffleHog JSON：字段路径与 gitleaks/SARIF 都不同，是最流行的密钥扫描器之一，必须支持。
   // 形态：{ DetectorName, SourceMetadata: { Data: { Filesystem: { file, line } } } } 或 Git 分支形态。
   const truffle = (Array.isArray(parsed) ? parsed : []).filter((it) => it && it.SourceMetadata && typeof it.SourceMetadata === 'object')
