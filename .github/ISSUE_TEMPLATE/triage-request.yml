@@ -1,0 +1,61 @@
+name: 申请一次密钥告警分诊
+description: 把你的扫描器报告给我，我逐条判定哪些是真泄露、哪些是噪声
+title: "[triage] "
+labels: ["triage-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **先看免费的部分**：你可以自己跑——
+        ```bash
+        node review.mjs <你的仓库> --from-report 你的报告.json
+        ```
+        自己跑出结果就不用申请了。只有在你希望有人**逐条给出判定理由**时，再填这个表。
+
+        > 不要在这里贴真实凭据。贴报告里的**路径与行号**即可；如果报告本身包含完整密钥值，请先替换成前 6 位 + `***`。
+  - type: input
+    id: repo
+    attributes:
+      label: 仓库/项目
+      description: 公开仓库给链接；私有仓库只需说明技术栈与规模（文件数）
+      placeholder: "例：私有，TypeScript + Go，约 1.2 万文件"
+    validations:
+      required: true
+  - type: dropdown
+    id: scanner
+    attributes:
+      label: 你用的是哪个扫描器
+      options:
+        - gitleaks
+        - TruffleHog
+        - Semgrep / 其他 SARIF 工具
+        - GitHub 原生 secret scanning
+        - 自研脚本或 grep
+        - 不确定
+    validations:
+      required: true
+  - type: input
+    id: count
+    attributes:
+      label: 报告里大约有多少条告警
+      placeholder: "例：28"
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: 贴 3–5 条示例（路径:行号 即可）
+      description: 我会先免费给出这几条的判定，让你判断值不值得继续
+      placeholder: |
+        src/config.ts:42
+        tests/fixtures/keys.json:7
+        deploy/k8s.yaml:19
+    validations:
+      required: true
+  - type: checkboxes
+    id: ack
+    attributes:
+      label: 确认
+      options:
+        - label: 我理解这不是渗透测试、不构成安全保证，只提供告警判定依据
+          required: true
