@@ -1,0 +1,14 @@
+=== 分诊已有扫描器输出 ===
+报告：/tmp/gh-sample-report.json
+输入候选 12 条 → **真需处理 0 条**，其余 12 条经语境分诊排除
+
+需要处理：无（0 条）
+
+已排除 · 扫描规则文件（12）：
+  - rules/digitalocean.yml:24 [generic-api-key]
+  - rules/generic.yml:34 [generic-api-key]
+  - rules/generic.yml:52 [generic-api-key]
+  - rules/generic.yml:58 [generic-api-key]
+  - rules/generic.yml:69 [generic-api-key]
+  - rules/generic.yml:198 [generic-api-key]
+  … 另有 6 条

@@ -1,0 +1,62 @@
+[
+  {
+    "File": "rules/digitalocean.yml",
+    "StartLine": 24,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "rules/generic.yml",
+    "StartLine": 34,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "rules/generic.yml",
+    "StartLine": 52,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "rules/generic.yml",
+    "StartLine": 58,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "rules/generic.yml",
+    "StartLine": 69,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "rules/generic.yml",
+    "StartLine": 198,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "rules/generic.yml",
+    "StartLine": 211,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "rules/shopify.yml",
+    "StartLine": 54,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "rules/slack.yml",
+    "StartLine": 28,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "rules/slack.yml",
+    "StartLine": 53,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "rules/slack.yml",
+    "StartLine": 85,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "rules/stripe.yml",
+    "StartLine": 15,
+    "RuleID": "generic-api-key"
+  }
+]
