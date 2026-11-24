@@ -1,0 +1,53 @@
+# 用我自己的仓库当 secret-triage-action 的第一个用户：在真实 runner 上跑一次，产出证据。
+name: self-test-action
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/self-test-action.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 造一份 gitleaks 风格的报告（1 条真 + 2 条噪声）
+        run: |
+          set -euo pipefail
+          mkdir -p rules tests src
+          printf 'placeholder\n' > rules/aws.yml
+          printf 'const fakeAws = "AKIAIOSFODNN7EXAMPLE"\n' > tests/redact.spec.ts
+          printf 'const t = "ghp_R2D2C3PO4BB8L5K9M1N7P0Q4S6T8V2W4X6Y8"\n' > src/leak.js
+          cat > gitleaks.json <<'JSON'
+          [
+            {"File":"rules/aws.yml","StartLine":1,"RuleID":"aws-access-token"},
+            {"File":"tests/redact.spec.ts","StartLine":1,"RuleID":"aws-access-token"},
+            {"File":"src/leak.js","StartLine":1,"RuleID":"github-pat"}
+          ]
+          JSON
+
+      - name: 用本仓库的 Action 做分诊（fail-on-real=false 以便观察输出）
+        id: triage
+        uses: zjdyzww/secret-triage-action@v1
+        with:
+          report: gitleaks.json
+          fail-on-real: 'false'
+
+      - name: 断言（必须 real=1 triaged=2，否则失败）
+        run: |
+          set -euo pipefail
+          echo "real=${{ steps.triage.outputs.real }} triaged=${{ steps.triage.outputs.triaged }}"
+          test "${{ steps.triage.outputs.real }}" = "1"
+          test "${{ steps.triage.outputs.triaged }}" = "2"
+          grep -q "src/leak.js" secret-triage-report.md
+          grep -q "rules/aws.yml" secret-triage-report.md
+          echo "断言通过：真泄露 1 条、语境排除 2 条，报告含正确条目"
+
+      - name: 上传报告
+        uses: actions/upload-artifact@v4
+        with:
+          name: triage-report
+          path: secret-triage-report.md
