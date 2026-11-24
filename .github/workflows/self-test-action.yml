@@ -35,6 +35,7 @@ jobs:
         with:
           report: gitleaks.json
           fail-on-real: 'false'
+          sarif-output: triage.sarif
 
       - name: 断言（必须 real=1 triaged=2，否则失败）
         run: |
@@ -44,10 +45,24 @@ jobs:
           test "${{ steps.triage.outputs.triaged }}" = "2"
           grep -q "src/leak.js" secret-triage-report.md
           grep -q "rules/aws.yml" secret-triage-report.md
+          # SARIF 断言：只含真发现（rules/aws.yml 与 tests/ 不得出现在 SARIF 里）
+          test -f triage.sarif
+          node -e '
+            const s = JSON.parse(require("fs").readFileSync("triage.sarif", "utf8"));
+            const res = s.runs[0].results;
+            if (s.version !== "2.1.0") throw new Error("bad sarif version");
+            if (res.length !== 1) throw new Error("expected 1 sarif result, got " + res.length);
+            const uri = res[0].locations[0].physicalLocation.artifactLocation.uri;
+            if (!uri.includes("src/leak.js")) throw new Error("wrong uri: " + uri);
+            if (JSON.stringify(s).includes("rules/aws.yml")) throw new Error("noise leaked into SARIF");
+            console.log("SARIF 断言通过：1 条结果，且噪声未泄漏");
+          '
           echo "断言通过：真泄露 1 条、语境排除 2 条，报告含正确条目"
 
       - name: 上传报告
         uses: actions/upload-artifact@v4
         with:
           name: triage-report
-          path: secret-triage-report.md
+          path: |
+            secret-triage-report.md
+            triage.sarif
