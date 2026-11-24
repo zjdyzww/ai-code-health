@@ -11,10 +11,15 @@
  *   弱特征（赋值形态的通用密钥名）只提示不判高危，且排除 example/placeholder/xxx 占位值。
  * @skill scan_deps — 依赖可复现性：浮动版本、安装期钩子、锁定文件缺失。
  * @skill run_script_probe — 探测并运行 npm test/build，带超时；超时/失败/缺失三态分明。
+ * @skill triage_scanner_report — **吃已有扫描器的输出**（gitleaks JSON / SARIF / 通用 file:line 文本），
+ *   只做语境分诊，不自己找。这是 2026-11-24 普查后的定位修正：我的 6 类强特征太窄（10 个通用库仅 2 候选），
+ *   所以价值在判定层，不在发现层。
  * @rule real_exit_code P0 — 0=无高危 / 1=有高危 / 2=用法错误 / 3=目标不可读
  * @rule no_code_upload P0 — 体检全程本地完成，不发起任何网络请求（可在离线机器运行）
  * @rule unverified_not_pass P0 — 无法执行的检查（无 package.json、脚本缺失）必须写 UNVERIFIED，不得计入通过
  * @rule evidence_per_finding P1 — 每个发现必须带 `相对路径:行号` 或真实退出码，禁止只给结论
+ * @rule report_mode_uses_scanner_findings P0 — `--from-report` 模式下，判定对象必须**完全来自输入报告**，
+ *   不得掺入本工具自己的扫描结果（否则客户无法核对"我给的那 28 条被判成什么"）。
  * @rule timeout_bounded P1 — 外部命令一律带超时（默认 180s），避免体检把客户机器挂死
  * @rule whitelabel_option P1 — `--no-brand` 输出不带任何我方标识，供外包团队以自有品牌交付（白标）
 
@@ -81,6 +86,82 @@ function collectFiles(root) {
 }
 
 /**
+ * 从已有扫描器报告中提取条目（file + line）。支持三种常见形态：
+ *  ① gitleaks JSON：`[{File, StartLine, RuleID}]`
+ *  ② SARIF：`runs[].results[].locations[].physicalLocation.{artifactLocation.uri, region.startLine}`
+ *  ③ 通用文本：任意行里出现 `<路径>:<行号>`（如 grep/git-hound 输出）
+ * @param {string} raw 报告原文
+ * @returns {Array<{file:string,line:number|null,rule:string|null}>}
+ */
+export function parseScannerReport(raw) {
+  const text = String(raw)
+  // ③ 先试 JSON（gitleaks / SARIF）
+  let parsed = null
+  try { parsed = JSON.parse(text) } catch { parsed = null }
+  if (Array.isArray(parsed)) {
+    const out = []
+    for (const item of parsed) {
+      const file = item?.File ?? item?.file ?? item?.path
+      if (!file) continue
+      out.push({ file: String(file), line: Number(item?.StartLine ?? item?.line ?? 0) || null, rule: item?.RuleID ?? null })
+    }
+    if (out.length > 0) return out
+  }
+  if (parsed && Array.isArray(parsed.runs)) {
+    const out = []
+    for (const run of parsed.runs) {
+      for (const res of run?.results ?? []) {
+        for (const loc of res?.locations ?? []) {
+          const uri = loc?.physicalLocation?.artifactLocation?.uri
+          if (!uri) continue
+          out.push({ file: String(uri).replace(/^file:\/\//, ''), line: Number(loc?.physicalLocation?.region?.startLine) || null, rule: res?.ruleId ?? null })
+        }
+      }
+    }
+    if (out.length > 0) return out
+  }
+  // ③ 通用文本
+  const out = []
+  const seen = new Set()
+  for (const line of text.split('\n')) {
+    const m = line.match(/([\w./@-]+\.[A-Za-z0-9]+):(\d+)/)
+    if (!m) continue
+    const key = `${m[1]}:${m[2]}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ file: m[1], line: Number(m[2]), rule: null })
+  }
+  return out
+}
+
+/**
+ * 对输入报告里的每条候选做语境分诊。
+ * @param {string} root 目标仓库根
+ * @param {Array} findings parseScannerReport 输出
+ * @returns {{real:Array, triaged:object}}
+ */
+export function triageFindings(root, findings) {
+  const triaged = { fixture: [], rulefile: [], doc: [], artifact: [], detector: [], snapshot: [] }
+  const real = []
+  for (const f of findings) {
+    const rel = String(f.file).replace(/^\.\//, '')
+    let lineText = ''
+    try {
+      const abs = join(root, rel)
+      if (existsSync(abs) && f.line) {
+        const lines = readFileSync(abs, 'utf8').split('\n')
+        lineText = lines[f.line - 1] ?? ''
+      }
+    } catch { lineText = '' }
+    const bucket = triageContext(rel, lineText)
+    const label = `${rel}${f.line ? `:${f.line}` : ''}${f.rule ? ` [${f.rule}]` : ''}`
+    if (bucket === 'real') real.push(label)
+    else triaged[bucket].push(label)
+  }
+  return { real, triaged }
+}
+
+/**
  * 判定一个命中是否落在「测试夹具/示例」语境里。
  * 依据（三选一即视为夹具）：路径含测试目录或测试文件后缀；同目录/同文件命名含 fixture|example|sample|mock；
  * 命中行本身带 fake|dummy|example|test 标记。**不猜内容，只看可核的路径与行文本。**
@@ -102,7 +183,12 @@ function collectFiles(root) {
 function triageContext(relPath, lineText) {
   if (isFixtureContext(relPath, lineText)) return 'fixture'
   const p = relPath.toLowerCase()
+  // 检测器的签名/规则定义文件：里面写的就是"密钥长什么样"的正则，必然命中自身（2026-11-24 普查实测：
+  // tillson/git-hound 的 31 条"真泄露"全部来自它自己的 rules/*.yml）。
   if (/(gitleaks\.toml|\.gitleaks|detect-secrets|secrets?[-_]?baseline|secret-patterns?)/.test(p)) return 'rulefile'
+  if (/(^|\/)(rules|signatures|patterns|detectors)(\/|$)/.test(p)) return 'rulefile'
+  if (/(regex|regexes|patterns?|signatures?|rules?)\.[a-z]+$/.test(p)) return 'rulefile'
+  if (/\.example\.(yml|yaml|json|env|toml)$|example\.[a-z]+\.(yml|yaml|json)$/.test(p)) return 'doc'
   if (p.endsWith('.md') || p.endsWith('.mdx') || p.endsWith('.txt') || p.includes('/docs/')) return 'doc'
   if (/(^|\/)(lib|dist|build|out|chunks|vendor)(\/|$)/.test(p) || /\.min\.(js|css)$/.test(p)) return 'artifact'
   // 检测器自身：文件就是"找密钥/找泄露"的实现，里面必然出现样例形态（本仓库实测 4 条全属此类）。
@@ -328,6 +414,55 @@ if (!existsSync(target) || !statSync(target).isDirectory()) {
 }
 const timeoutIdx = argv.indexOf('--timeout')
 const timeoutMs = (timeoutIdx >= 0 ? Number(argv[timeoutIdx + 1]) : 180) * 1000
+
+// —— 模式二：分诊已有扫描器的输出（--from-report）——
+const reportIdx = argv.indexOf('--from-report')
+if (reportIdx >= 0) {
+  const reportPath = argv[reportIdx + 1]
+  if (!reportPath) {
+    console.error('用法: node review.mjs <仓库根> --from-report <扫描器输出文件> [--json]')
+    process.exit(2)
+  }
+  let raw
+  try { raw = readFileSync(reportPath, 'utf8') } catch (error) {
+    console.error(`报告不可读: ${reportPath}（${error.message}）`)
+    process.exit(3)
+  }
+  const findings = parseScannerReport(raw)
+  if (findings.length === 0) {
+    console.error('报告里没有解析出任何条目（支持 gitleaks JSON / SARIF / 含 file:line 的文本）')
+    process.exit(3)
+  }
+  const { real, triaged } = triageFindings(target, findings)
+  const triTotal = Object.values(triaged).reduce((sum, arr) => sum + arr.length, 0)
+  if (argv.includes('--json')) {
+    console.log(JSON.stringify({
+      mode: 'from-report',
+      report: reportPath,
+      measures: { total: findings.length, real: real.length, triaged: triTotal, buckets: Object.fromEntries(Object.entries(triaged).map(([k, v]) => [k, v.length])) },
+      real,
+      triaged,
+    }, null, 2))
+  } else {
+    console.log('=== 分诊已有扫描器输出 ===')
+    console.log(`报告：${reportPath}`)
+    console.log(`输入候选 ${findings.length} 条 → **真需处理 ${real.length} 条**，其余 ${triTotal} 条经语境分诊排除`)
+    if (real.length > 0) {
+      console.log('\n需要处理：')
+      for (const r of real) console.log(`  - ${r}`)
+    } else {
+      console.log('\n需要处理：无（0 条）')
+    }
+    const labels = { fixture: '测试夹具', rulefile: '扫描规则文件', doc: '文档/模板', artifact: '构建产物', detector: '检测器自身', snapshot: '知识库快照' }
+    for (const [k, arr] of Object.entries(triaged)) {
+      if (arr.length === 0) continue
+      console.log(`\n已排除 · ${labels[k]}（${arr.length}）：`)
+      for (const x of arr.slice(0, 6)) console.log(`  - ${x}`)
+      if (arr.length > 6) console.log(`  … 另有 ${arr.length - 6} 条`)
+    }
+  }
+  process.exit(real.length > 0 ? 1 : 0)
+}
 
 const secrets = scanSecrets(target)
 const deps = scanDeps(target)

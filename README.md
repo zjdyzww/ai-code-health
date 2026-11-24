@@ -26,6 +26,31 @@ node review.mjs /path/to/your/repo --timeout 300    # 测试/构建超时（默�
 
 退出码：`0` 无高危 · `1` 有高危 · `2` 用法错误 · `3` 目标不可读 —— 可直接挂进 CI。
 
+
+## 模式二：分诊**已有扫描器**的输出（推荐用法）
+
+> 定位修正（2026-11-24 普查后）：我的 6 类强特征太窄——在 10 个主流通用库（2242 文件）上只有 2 条候选。
+> **所以我不该假装替代你的扫描器；我的价值在判定层。**
+
+```bash
+node review.mjs <你的仓库> --from-report gitleaks-report.json
+```
+
+支持三种输入格式：
+| 格式 | 例子 |
+|---|---|
+| gitleaks JSON | `[{"File":"rules/aws.yml","StartLine":16,"RuleID":"aws-access-token"}]` |
+| SARIF | `{"runs":[{"results":[{"locations":[{"physicalLocation":{"artifactLocation":{"uri":"..."},...}}]}]}]}` |
+| 任意含 `路径:行号` 的文本 | `rules/aws.yml:16:1 aws-access-token` |
+
+**实测**（5 条输入的 gitleaks 风格报告）：
+```
+输入候选 5 条 → 真需处理 1 条（src/leak-real.js:2），其余 4 条：
+  测试夹具 2：tests/redact.spec.ts:44、docs/example-env.md:5
+  扫描规则文件 2：rules/aws.yml:16、rules/github.yml:13
+```
+退出码：`0` 全部被排除 / `1` 有真需处理 / `3` 报告不可读或无条目。
+
 ## 四项检查
 
 | 检查 | 内容 | 输出 |
