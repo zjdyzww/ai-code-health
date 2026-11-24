@@ -20,7 +20,8 @@ jobs:
           mkdir -p rules tests src
           printf 'placeholder\n' > rules/aws.yml
           printf 'const fakeAws = "AKIAIOSFODNN7EXAMPLE"\n' > tests/redact.spec.ts
-          printf 'const t = "ghp_R2D2C3PO4BB8L5K9M1N7P0Q4S6T8V2W4X6Y8"\n' > src/leak.js
+          # 运行时拼接，避免完整密钥字面量出现在本仓库源码里（否则自己扫自己会误报——实测踩过两次）
+          printf 'const t = "%s%s"\n' 'ghp_' 'R2D2C3PO4BB8L5K9M1N7P0Q4S6T8V2W4X6Y8' > src/leak.js
           cat > gitleaks.json <<'JSON'
           [
             {"File":"rules/aws.yml","StartLine":1,"RuleID":"aws-access-token"},
