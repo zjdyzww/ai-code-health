@@ -97,3 +97,16 @@ node review.mjs <你的仓库> --from-report gitleaks-report.json
 - 不做渗透测试、不做合规认证（等保/SOC2 需持牌机构）
 - 不覆盖非 Node 生态的测试/构建探测（会写 `absent`，不猜）
 - 报告只覆盖"本机能跑到的部分"；外部依赖缺失记 `UNVERIFIED`
+
+## 直接用 GitHub Action（无需安装）
+
+```yaml
+- name: Triage it
+  uses: zjdyzww/secret-triage-action@v1
+  with:
+    report: gitleaks.json      # 你自己的扫描器输出
+    fail-on-real: 'true'       # 只在真有问题时让构建红
+```
+
+输出 `real` / `triaged` 两个值，并把摘要写进 Job Summary。
+该 Action 已在本仓库的真 runner 上跑通（见 `.github/workflows/self-test-action.yml`）。
