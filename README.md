@@ -1,5 +1,18 @@
 # secret-scan-triage · 密钥扫描误报分诊（原先叫 ai-code-health）
 
+![before/after](assets/before-after.svg)
+
+**你的扫描器说"发现 3 个泄露"，其实只有 1 个是真的。** 这个工具把噪声摘掉——只在真的需要轮换凭据时才让你红。
+
+```bash
+node review.mjs <你的仓库> --from-report 你的报告.json
+```
+
+已验证：3 条输入 → GitHub 代码扫描里只进 **1 条**告警（[可自己查 API](https://github.com/zjdyzww/secret-triage-demo)）。
+
+技术说明：[为什么"更严的正则"救不了你的密钥扫描](WHY-CONTEXT-BEATS-REGEX.md)（含两组实测数据与复现命令）。
+
+
  > 三分钟出报告：**扫描器报的这些告警，哪几条是真的。**
 > 全程本地运行，不上传一行代码。
 
