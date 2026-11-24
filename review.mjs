@@ -16,6 +16,8 @@
  * @rule unverified_not_pass P0 — 无法执行的检查（无 package.json、脚本缺失）必须写 UNVERIFIED，不得计入通过
  * @rule evidence_per_finding P1 — 每个发现必须带 `相对路径:行号` 或真实退出码，禁止只给结论
  * @rule timeout_bounded P1 — 外部命令一律带超时（默认 180s），避免体检把客户机器挂死
+ * @rule whitelabel_option P1 — `--no-brand` 输出不带任何我方标识，供外包团队以自有品牌交付（白标）
+
  * @depends node:fs, node:child_process, node:path
  * @error TargetUnreadable — 目标目录不存在或不可读 → 退出码 3
  * @metric measures{files,criticalSecrets,weakWarnings,deps,depFindings} — `--json` 输出，供上游汇总
@@ -196,6 +198,11 @@ function runScript(root, script, timeoutMs) {
   let pkg
   try { pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) } catch { return { status: 'absent', detail: 'package.json 不可解析' } }
   if (!pkg.scripts || !pkg.scripts[script]) return { status: 'absent', detail: `未定义 ${script} 脚本` }
+  // 依赖未安装时跑 test/build 必然失败，那不是"项目坏了"而是"没装依赖"（实测踩过：sitesentinel 被判 fail）。
+  const depCount = Object.keys({ ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) }).length
+  if (depCount > 0 && !existsSync(join(root, 'node_modules'))) {
+    return { status: 'not-run', detail: `未安装依赖（缺 node_modules，${depCount} 个依赖）⇒ 本项 UNVERIFIED，装依赖后重跑` }
+  }
   try {
     const out = execFileSync('npm', ['run', '--silent', script], {
       cwd: root, encoding: 'utf8', timeout: timeoutMs, stdio: ['ignore', 'pipe', 'pipe'],
@@ -215,7 +222,7 @@ function runScript(root, script, timeoutMs) {
  * @param {object} data 各检查结果
  * @returns {string} Markdown
  */
-function renderMarkdown(root, data) {
+function renderMarkdown(root, data, noBrand = false) {
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19)
   const criticalCount = data.secrets.critical.length
   const lines = []
@@ -234,7 +241,8 @@ function renderMarkdown(root, data) {
     lines.push(`- 逐条判定后：**${data.secrets.critical.length} 条需要处理**，其余 ${totalCandidates - data.secrets.critical.length} 条是测试/文档/构建产物里的假值。`)
     lines.push('- **需要处理的那几条，请安排人今天就轮换凭据**（先撤销再改代码，顺序不能反）。')
   }
-  lines.push(`- 测试：${data.test.status === 'pass' ? '通过' : data.test.status}；构建：${data.build.status === 'pass' ? '通过' : data.build.status}。`)
+  const brief = (st) => (st === 'pass' ? '通过' : st === 'not-run' ? '未运行（缺依赖，视为未测）' : st === 'absent' ? '无此脚本' : st)
+  lines.push(`- 测试：${brief(data.test.status)}；构建：${brief(data.build.status)}。`)
   lines.push('')
   lines.push('> 判定的每一类都有依据（见下文表格）。报告里每条结论都附命令，你的工程师能自己跑出同样结果。')
   lines.push('')
@@ -281,10 +289,11 @@ function renderMarkdown(root, data) {
   if (data.deps.unverified.length > 0) for (const u of data.deps.unverified) lines.push(`- UNVERIFIED：${u}`)
   lines.push('')
   lines.push('## 3. 测试')
-  lines.push(`状态：**${data.test.status}**${data.test.detail ? `（${data.test.detail}）` : ''}`)
+  const label = (st) => (st === 'not-run' ? 'UNVERIFIED（未运行）' : st)
+  lines.push(`状态：**${label(data.test.status)}**${data.test.detail ? `（${data.test.detail}）` : ''}`)
   lines.push('')
   lines.push('## 4. 构建')
-  lines.push(`状态：**${data.build.status}**${data.build.detail ? `（${data.build.detail}）` : ''}`)
+  lines.push(`状态：**${label(data.build.status)}**${data.build.detail ? `（${data.build.detail}）` : ''}`)
   lines.push('')
   lines.push('## 建议动作')
   const actions = []
@@ -297,7 +306,13 @@ function renderMarkdown(root, data) {
   for (const a of actions) lines.push(`- ${a}`)
   lines.push('')
   lines.push('---')
-  lines.push('本报告由本地工具生成，不上传任何代码。每条结论均可用报告中的命令复现。')
+  if (noBrand) {
+    lines.push('本报告由本地工具生成，不上传任何代码。每条结论均可用报告中的命令复现。')
+  } else {
+    lines.push('本报告由本地工具生成，不上传任何代码。每条结论均可用报告中的命令复现。')
+    lines.push('')
+    lines.push('_ai-code-health · 一键代码体检（可白标交付）_')
+  }
   return lines.join('\n') + '\n'
 }
 
@@ -341,7 +356,7 @@ if (argv.includes('--json')) {
   process.exit(secrets.critical.length > 0 ? 1 : 0)
 }
 
-const md = renderMarkdown(target, data)
+const md = renderMarkdown(target, data, argv.includes('--no-brand'))
 const outIdx = argv.indexOf('--out')
 if (outIdx >= 0 && argv[outIdx + 1]) {
   writeFileSync(argv[outIdx + 1], md, 'utf8')
