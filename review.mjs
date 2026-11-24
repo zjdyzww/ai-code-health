@@ -221,6 +221,23 @@ function renderMarkdown(root, data) {
   const lines = []
   lines.push('# AI 代码体检报告')
   lines.push('')
+  // 一页老板版摘要（2026-11-24）：工程报告没人看完，先给结论与"要不要管"。
+  const totalCandidates = data.secrets.critical.length
+    + Object.values(data.secrets.triaged).reduce((sum, arr) => sum + arr.length, 0)
+  const needAction = totalCandidates - totalCandidates + data.secrets.critical.length
+  lines.push('## 一页结论（给不做技术的人看）')
+  lines.push('')
+  lines.push(`- 工具一共报了 **${totalCandidates}** 条"疑似泄露"。`)
+  if (data.secrets.critical.length === 0) {
+    lines.push(`- 逐条判定后：**没有一条是真的**。所以这一项你现在不用安排人处理（${needAction === 0 ? '0 条待办' : `${needAction} 条待办`}）。`)
+  } else {
+    lines.push(`- 逐条判定后：**${data.secrets.critical.length} 条需要处理**，其余 ${totalCandidates - data.secrets.critical.length} 条是测试/文档/构建产物里的假值。`)
+    lines.push('- **需要处理的那几条，请安排人今天就轮换凭据**（先撤销再改代码，顺序不能反）。')
+  }
+  lines.push(`- 测试：${data.test.status === 'pass' ? '通过' : data.test.status}；构建：${data.build.status === 'pass' ? '通过' : data.build.status}。`)
+  lines.push('')
+  lines.push('> 判定的每一类都有依据（见下文表格）。报告里每条结论都附命令，你的工程师能自己跑出同样结果。')
+  lines.push('')
   lines.push(`- 目标：\`${root}\``)
   lines.push(`- 时间：${now}`)
   lines.push(`- 扫描文件：${data.secrets.scanned}`)
