@@ -127,3 +127,7 @@ node review.mjs <你的仓库> --from-report gitleaks-report.json
 gh api /repos/OWNER/REPO/secret-scanning/alerts > alerts.json
 node review.mjs . --from-report alerts.json
 ```
+
+> 诚实标注：GitHub 告警格式按**官方 schema** 实现并用人工构造样本测过（2 条输入 → 1 真 1 排除）；
+> 但**尚未用真实导出验证**——我账号下公开仓库的 `secret-scanning/alerts` 导出为 `[]`，无法取得真实样本。
+```
