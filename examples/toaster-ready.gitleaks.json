@@ -1,0 +1,47 @@
+[
+  {
+    "File": "internal/check/secrets_test.go",
+    "StartLine": 22,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "internal/check/secrets_test.go",
+    "StartLine": 32,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "internal/check/secrets_test.go",
+    "StartLine": 55,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "internal/check/secrets_test.go",
+    "StartLine": 56,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "internal/check/secrets_test.go",
+    "StartLine": 57,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "internal/check/secrets_test.go",
+    "StartLine": 58,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "internal/check/secrets_test.go",
+    "StartLine": 65,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "internal/check/testdata/badrepo/app.py",
+    "StartLine": 3,
+    "RuleID": "generic-api-key"
+  },
+  {
+    "File": "internal/repo/repo_test.go",
+    "StartLine": 55,
+    "RuleID": "generic-api-key"
+  }
+]

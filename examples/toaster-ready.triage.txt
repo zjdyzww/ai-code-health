@@ -1,0 +1,14 @@
+=== 分诊已有扫描器输出 ===
+报告：examples/toaster-ready.gitleaks.json
+输入候选 9 条 → **真需处理 0 条**，其余 9 条经语境分诊排除
+
+需要处理：无（0 条）
+
+已排除 · 测试夹具（9）：
+  - internal/check/secrets_test.go:22 [generic-api-key]
+  - internal/check/secrets_test.go:32 [generic-api-key]
+  - internal/check/secrets_test.go:55 [generic-api-key]
+  - internal/check/secrets_test.go:56 [generic-api-key]
+  - internal/check/secrets_test.go:57 [generic-api-key]
+  - internal/check/secrets_test.go:58 [generic-api-key]
+  … 另有 3 条
