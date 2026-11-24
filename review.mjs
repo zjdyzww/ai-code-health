@@ -107,6 +107,20 @@ export function parseScannerReport(raw) {
     }
     if (out.length > 0) return out
   }
+  // TruffleHog JSON：字段路径与 gitleaks/SARIF 都不同，是最流行的密钥扫描器之一，必须支持。
+  // 形态：{ DetectorName, SourceMetadata: { Data: { Filesystem: { file, line } } } } 或 Git 分支形态。
+  const truffle = (Array.isArray(parsed) ? parsed : []).filter((it) => it && it.SourceMetadata && typeof it.SourceMetadata === 'object')
+  if (truffle.length > 0) {
+    const out = []
+    for (const it of truffle) {
+      const data = it.SourceMetadata?.Data ?? {}
+      const loc = data.Filesystem ?? data.Git ?? data.GitHub ?? data.S3 ?? {}
+      const file = loc.file ?? loc.filename ?? (Array.isArray(loc.files) ? loc.files[0] : null)
+      if (!file) continue
+      out.push({ file: String(file), line: Number(loc.line ?? loc.startLine ?? 0) || null, rule: it.DetectorName ?? null })
+    }
+    if (out.length > 0) return out
+  }
   if (parsed && Array.isArray(parsed.runs)) {
     const out = []
     for (const run of parsed.runs) {

@@ -40,6 +40,7 @@ node review.mjs <你的仓库> --from-report gitleaks-report.json
 | 格式 | 例子 |
 |---|---|
 | gitleaks JSON | `[{"File":"rules/aws.yml","StartLine":16,"RuleID":"aws-access-token"}]` |
+| TruffleHog JSON | `[{"DetectorName":"AWS","SourceMetadata":{"Data":{"Filesystem":{"file":"rules/aws.yml","line":16}}}}]` |
 | SARIF | `{"runs":[{"results":[{"locations":[{"physicalLocation":{"artifactLocation":{"uri":"..."},...}}]}]}]}` |
 | 任意含 `路径:行号` 的文本 | `rules/aws.yml:16:1 aws-access-token` |
 
