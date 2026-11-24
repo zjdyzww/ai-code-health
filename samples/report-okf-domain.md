@@ -1,6 +1,6 @@
 # AI 代码体检报告
 
-- 目标：`/data/mysources/dsh-rsi/packages/oscplugins/okf-domain`
+- 目标：`<target-repo>`
 - 时间：2026-11-24 06:57:55
 - 扫描文件：24
 - 结论：**无高危泄露**
